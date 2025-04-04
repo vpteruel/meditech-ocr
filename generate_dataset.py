@@ -1,22 +1,22 @@
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 from ulid import ULID
 from tqdm import tqdm
-import numpy as np
+import argparse
+import shutil
+import numpy
 import os
 import random
-
-qty = 50
 
 bar_format = "[{l_bar}{bar} {rate_fmt}{postfix} | {n_fmt}/{total_fmt} {elapsed}<{remaining}]"
 
 # List of fonts to use
 fonts = [
-    { 'path': 'fonts/T_win10.otf', 'size': 5, 'height_control': -32, 'qty': qty },
-    { 'path': 'fonts/T_win15.otf', 'size': 8, 'height_control': -22, 'qty': qty },
-    { 'path': 'fonts/T_win80.otf', 'size': 8, 'height_control': 16, 'qty': qty },
-    { 'path': 'fonts/Xfont80.otf', 'size': 14, 'height_control': 32, 'qty': qty },
-    { 'path': 'fonts/Xfontlg.otf', 'size': 12, 'height_control': -24, 'qty': qty },
-    { 'path': 'fonts/Xfontsm.otf', 'size': 12, 'height_control': 24, 'qty': qty },
+    { 'path': 'fonts/T_win10.otf', 'size': 5, 'height_control': -32 },
+    { 'path': 'fonts/T_win15.otf', 'size': 8, 'height_control': -22 },
+    { 'path': 'fonts/T_win80.otf', 'size': 8, 'height_control': 16 },
+    { 'path': 'fonts/Xfont80.otf', 'size': 14, 'height_control': 32 },
+    { 'path': 'fonts/Xfontlg.otf', 'size': 12, 'height_control': -24 },
+    { 'path': 'fonts/Xfontsm.otf', 'size': 12, 'height_control': 24 },
 ]
 
 def generate_random_ulid():
@@ -55,23 +55,15 @@ rand_types = [
 
 # Output directory for generated images
 output_dir = "dataset"
-os.makedirs(output_dir, exist_ok=True)
 
-def delete_existing_files(output_dir):
-    """Delete existing files in the output directory."""
+def recreate_output_folder(output_dir):
+    """Delete and recreate the output directory."""
 
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-        return
-
-    for filename in tqdm(os.listdir(output_dir), bar_format=bar_format, leave=False):
-        file_path = os.path.join(output_dir, filename)
-        try:
-            if os.path.isfile(file_path):
-                os.remove(file_path)
-                tqdm.write(f"Deleted {filename}")
-        except Exception as e:
-            tqdm.write(f"Error deleting {filename}: {e}")
+    if os.path.exists(output_dir):
+        print(f"Deleting {output_dir} folder...")
+        shutil.rmtree(output_dir)
+    print(f"Creating {output_dir} folder...")
+    os.makedirs(output_dir, exist_ok=True)
 
 def generate_image(dataset_id, text, font_path, font_size, height_control, output_dir):
     """Generate an image with random text using the specified font."""
@@ -82,7 +74,7 @@ def generate_image(dataset_id, text, font_path, font_size, height_control, outpu
 
         # Create a noise background
         width, height = 280, 36
-        noise = np.random.randint(195, 255, (height, width), dtype=np.uint8)
+        noise = numpy.random.randint(195, 255, (height, width), dtype=numpy.uint8)
         noise_image = Image.fromarray(noise, mode='L').filter(ImageFilter.GaussianBlur(radius=1))
 
         # Create an RGB image and paste the noise background
@@ -109,19 +101,27 @@ def generate_image(dataset_id, text, font_path, font_size, height_control, outpu
     except Exception as e:
         tqdm.write(f"Error with font {font_path}: {e}")
 
-delete_existing_files(output_dir)
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-q", required=True, type=int, help="Quantity of images to generate for each font")
+    args = parser.parse_args()
 
-# Generate images for each font and random type
-for font in tqdm(fonts, bar_format=bar_format):
-    font_path = font['path']
-    font_size = font['size']
-    height_control = font['height_control']
-    qty = font['qty']
+    qty = args.q
+    if qty < 1:
+        raise ValueError("Quantity must be greater than 0")
 
-    for rand_type in tqdm(rand_types, bar_format=bar_format, leave=False):
-        for _ in tqdm(range(qty), bar_format=bar_format, leave=False):
-            dataset_id, text = rand_type()
+    recreate_output_folder(output_dir)
+    
+    # Generate images for each font and random type
+    for font in tqdm(fonts, bar_format=bar_format):
+        font_path = font['path']
+        font_size = font['size']
+        height_control = font['height_control']
+        
+        for rand_type in tqdm(rand_types, bar_format=bar_format, leave=False):
+            for _ in tqdm(range(qty), bar_format=bar_format, leave=False):
+                dataset_id, text = rand_type()
 
-            generate_image(dataset_id, text, font_path, font_size, height_control, output_dir)
-            
-            tqdm.write(f"{font_path} | {dataset_id} | {text} ")
+                generate_image(dataset_id, text, font_path, font_size, height_control, output_dir)
+                
+                tqdm.write(f"{font_path} | {dataset_id} | {text} ")
