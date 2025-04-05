@@ -6,8 +6,10 @@ import shutil
 import numpy
 import os
 import random
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-bar_format = "[{l_bar}{bar} {rate_fmt}{postfix} | {n_fmt}/{total_fmt} {elapsed}<{remaining}]"
+# bar_format = "[{l_bar}{bar} {rate_fmt}{postfix} | {n_fmt}/{total_fmt} {elapsed}<{remaining}]"
+bar_format = "{l_bar}{bar}|"
 
 # List of fonts to use
 fonts = [
@@ -101,27 +103,46 @@ def generate_image(dataset_id, text, font_path, font_size, height_control, outpu
     except Exception as e:
         tqdm.write(f"Error with font {font_path}: {e}")
 
+def generate_images_for_font(font, qty, output_dir, progress_bar):
+    """Generate images for a specific font."""
+    font_path = font['path']
+    font_size = font['size']
+    height_control = font['height_control']
+
+    for rand_type in rand_types:
+        for _ in range(qty):
+            dataset_id, text = rand_type()
+            generate_image(dataset_id, text, font_path, font_size, height_control, output_dir)
+            progress_bar.update(1)  # Update the shared progress bar
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-q", required=True, type=int, help="Quantity of images to generate for each font")
+    parser.add_argument("-q", required=False, type=int, help="Quantity of images to generate for each font")
+    parser.add_argument("-o", required=False, type=str, help="Output directory for generated images", default=output_dir)
+    parser.add_argument("-d", required=False, help="Delete the output folder before generating images", action="store_true")
     args = parser.parse_args()
 
     qty = args.q
-    if qty < 1:
+    if qty and qty < 1:
         raise ValueError("Quantity must be greater than 0")
+    if args.o:
+        output_dir = args.o
+    if args.d:
+        recreate_output_folder(args.o)
 
-    recreate_output_folder(output_dir)
-    
-    # Generate images for each font and random type
-    for font in tqdm(fonts, bar_format=bar_format):
-        font_path = font['path']
-        font_size = font['size']
-        height_control = font['height_control']
-        
-        for rand_type in tqdm(rand_types, bar_format=bar_format, leave=False):
-            for _ in tqdm(range(qty), bar_format=bar_format, leave=False):
-                dataset_id, text = rand_type()
+    if qty:
+        # Calculate the total number of tasks for the progress bar
+        total_tasks = len(fonts) * len(rand_types) * qty
 
-                generate_image(dataset_id, text, font_path, font_size, height_control, output_dir)
-                
-                tqdm.write(f"{font_path} | {dataset_id} | {text} ")
+        # Create a shared tqdm progress bar
+        with tqdm(total=total_tasks, desc="Generating Images", bar_format=bar_format) as progress_bar:
+            # Use ThreadPoolExecutor for parallel processing
+            with ThreadPoolExecutor() as executor:
+                futures = [
+                    executor.submit(generate_images_for_font, font, qty, output_dir, progress_bar)
+                    for font in fonts
+                ]
+
+                # Wait for all tasks to complete
+                for future in as_completed(futures):
+                    future.result()
