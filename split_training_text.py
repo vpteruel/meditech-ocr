@@ -11,14 +11,14 @@ with open(training_text_file, 'r') as input_file:
     for line in input_file.readlines():
         lines.append(line.strip())
 
-output_directory = 'tesstrain/data/Apex-ground-truth'
+output_directory = 'tesstrain/data/Meditech-ground-truth'
 
 if not os.path.exists(output_directory):
     os.mkdir(output_directory)
 
 random.shuffle(lines)
 
-count = 100
+count = 10
 
 lines = lines[:count]
 
@@ -33,7 +33,9 @@ for line in lines:
 
     subprocess.run([
         'text2image',
-        '--font=Apex',
+        '--find_fonts',
+        '--fonts_dir=fonts',
+        '--font=fonts/cour.ttf',
         f'--text={line_training_text}',
         f'--outputbase={output_directory}/{file_base_name}',
         '--max_pages=1',
