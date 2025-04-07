@@ -2,3 +2,7 @@ Pillow
 numpy
 tqdm
 python-ulid
+
+# optional
+pytesseract
+opencv-python

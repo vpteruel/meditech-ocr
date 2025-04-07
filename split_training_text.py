@@ -35,7 +35,7 @@ for line in lines:
         'text2image',
         '--find_fonts',
         '--fonts_dir=fonts',
-        '--font=fonts/cour.ttf',
+        '--font=fonts/Xfont80.otf',
         f'--text={line_training_text}',
         f'--outputbase={output_directory}/{file_base_name}',
         '--max_pages=1',
