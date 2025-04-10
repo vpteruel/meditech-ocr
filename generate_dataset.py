@@ -7,20 +7,35 @@ import numpy as np
 import os
 import random
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
 
 # bar_format = "[{l_bar}{bar} {rate_fmt}{postfix} | {n_fmt}/{total_fmt} {elapsed}<{remaining}]"
 bar_format = "{l_bar}{bar}|"
 
 # List of fonts to use
 fonts = [
-    # { 'path': 'fonts/cour.ttf', 'size': 16, 'height_control': 8 },
     { 'path': 'fonts/T_win10.otf', 'size': 5, 'left_padding': 1, 'top_padding': 10, 'right_padding': 1, 'bottom_padding': 0 },
-    { 'path': 'fonts/T_win15.otf', 'size': 8, 'left_padding': 2, 'top_padding': 3, 'right_padding': 0, 'bottom_padding': 2 },
+    { 'path': 'fonts/T_win15.otf', 'size': 8, 'left_padding': 2, 'top_padding': 3, 'right_padding': 0, 'bottom_padding': 4 },
     { 'path': 'fonts/T_win80.otf', 'size': 8, 'left_padding': 1, 'top_padding': -16, 'right_padding': 0, 'bottom_padding': 20 },
-    # { 'path': 'fonts/Xfont80.otf', 'size': 14, 'height_control': 32 },
-    # { 'path': 'fonts/Xfontlg.otf', 'size': 12, 'height_control': -24 },
-    # { 'path': 'fonts/Xfontsm.otf', 'size': 12, 'height_control': 24 },
+    { 'path': 'fonts/Xfont80.otf', 'size': 14, 'left_padding': 1, 'top_padding': -30, 'right_padding': 0, 'bottom_padding': 28 },
+    { 'path': 'fonts/Xfontlg.otf', 'size': 12, 'left_padding': 2, 'top_padding': -1, 'right_padding': 0, 'bottom_padding': 4 },
+    { 'path': 'fonts/Xfontsm.otf', 'size': 12, 'left_padding': 1, 'top_padding': -25, 'right_padding': 1, 'bottom_padding': 25 },
 ]
+
+# Output directory for generated images
+output_dir = "tesstrain/data/Meditech-ground-truth"
+
+# Add a global counter and lock
+image_counter = 0
+counter_lock = threading.Lock()
+
+def get_next_image_id():
+    """Get the next image ID in a thread-safe way."""
+    global image_counter
+    with counter_lock:
+        current_id = image_counter
+        image_counter += 1
+    return current_id
 
 def generate_random_ulid():
     """Generate a random ULID string."""
@@ -58,17 +73,6 @@ def generate_random_string(length=2):
 
     return (str(ulid), f"{string}")
 
-# List of random types to generate
-rand_types = [
-    generate_random_ulid,
-    generate_random_date_string,
-    generate_randon_number_string,
-    # generate_random_string,
-]
-
-# Output directory for generated images
-output_dir = "dataset"
-
 def recreate_output_folder(output_dir):
     """Delete and recreate the output directory."""
 
@@ -78,13 +82,15 @@ def recreate_output_folder(output_dir):
     print(f"Creating {output_dir} folder...")
     os.makedirs(output_dir, exist_ok=True)
 
-def generate_image(dataset_id, text, font_path, font_size, paddings, output_dir):
+def generate_image(image_id, text, font_path, font_size, paddings, output_dir, debug):
     """Generate an image with random text using the specified font."""
+
+    # Set the random seed for reproducibility
+    left_padding, top_padding, right_padding, bottom_padding = paddings
 
     try:
         # Load the font
-        font = ImageFont.truetype(font_path, size=font_size)
-        left_padding, top_padding, right_padding, bottom_padding = paddings
+        font = ImageFont.truetype(font_path, size=font_size, encoding="unic")
 
         # Set the image size
         width, height = 320, 100
@@ -138,57 +144,29 @@ def generate_image(dataset_id, text, font_path, font_size, paddings, output_dir)
         # Draw the text (using original method for rendering)
         draw.text((x, y), text, font=font, fill="black")
 
-        # Draw bounding boxes for debugging (optional)
-        for entry in box_entries:
-            char, left, bottom, right, top, _ = entry.split()
-            left, bottom, right, top = map(int, (left, bottom, right, top))
-            draw.rectangle([left, height - top, right, height - bottom], outline="red", width=1)            
+        if debug:
+            # Draw bounding boxes for debugging (optional)
+            for entry in box_entries:
+                char, left, bottom, right, top, _ = entry.split()
+                left, bottom, right, top = map(int, (left, bottom, right, top))
+                draw.rectangle([left, height - top, right, height - bottom], outline="red", width=1)            
 
         # Save as TIFF (required for Tesseract training)
-        image.save(os.path.join(output_dir, f"{dataset_id}.tif"))
-        # image.save(os.path.join(output_dir, f"{dataset_id}.png"))
+        image.save(os.path.join(output_dir, f"eng_{image_id}.tif"))
+        # image.save(os.path.join(output_dir, f"{image_id}.png"))
 
         # Save .box file (same name as image)
-        with open(os.path.join(output_dir, f"{dataset_id}.box"), "w") as f:
+        with open(os.path.join(output_dir, f"eng_{image_id}.box"), "w") as f:
             f.write("\n".join(box_entries))
 
         # Save ground truth text
-        with open(os.path.join(output_dir, f"{dataset_id}.gt.txt"), "w") as f:
+        with open(os.path.join(output_dir, f"eng_{image_id}.gt.txt"), "w") as f:
             f.write(text)
-
-
-        ### old code
-
-        # # Use textbbox to calculate text size
-        # text_bbox = draw.textbbox((0, 0), text, font=font)
-        # text_width = text_bbox[2] - text_bbox[0]
-        # text_height = text_bbox[3] - text_bbox[1]
-        # # x = (width - text_width) // 2
-        # # y = (height - text_height - height_control) // 2
-        # x = 22
-        # y = 26
-        # draw.text((x, y), text, font=font, fill="black")
-
-        # # new a new rectangle with the x and y coordinates
-        # # (left, top, right, bottom) bounding box
-        # # bounding box (x, y, with, height)
-        # text_bbox = (x, y - text_height, x + text_width, y + text_height)
-        # # Draw a rectangle around the text
-        # # draw.rectangle((24, 16, 8, 15), outline="red", width=1)
-        
-        # # draw.rectangle(text_bbox, outline="red", width=1)
-        # # draw.rectangle(((x, y), (x + text_width, y + text_height)), outline='Red')
-
-        # # Save the image
-        # image.save(os.path.join(output_dir, f"{dataset_id}.png"))
-        # # Save the ground truth text
-        # with open(os.path.join(output_dir, f"{dataset_id}.gt.txt"), "w") as f:
-        #     f.write(text)
         
     except Exception as e:
         tqdm.write(f"Error with font {font_path}: {e}")
 
-def generate_images_for_font(font, qty, output_dir, progress_bar):
+def generate_images_for_font(font, qty, output_dir, progress_bar, debug):
     """Generate images for a specific font."""
     font_path = font['path']
     font_size = font['size']
@@ -200,16 +178,28 @@ def generate_images_for_font(font, qty, output_dir, progress_bar):
 
     for rand_type in rand_types:
         for _ in range(qty):
-            dataset_id, text = rand_type()
-            generate_image(dataset_id, text, font_path, font_size, paddings, output_dir)
-
+            _, text = rand_type()
+            image_id = get_next_image_id()  # Get sequential ID instead
+            generate_image(image_id, text, font_path, font_size, paddings, output_dir, debug)
             progress_bar.update(1)  # Update the shared progress bar
 
+# List of random types to generate
+rand_types = [
+    generate_random_ulid,
+    generate_random_date_string,
+    generate_randon_number_string,
+    # generate_random_string,
+]
+
 if __name__ == "__main__":
+    # Reset counter before generating images
+    image_counter = 0
+
     parser = argparse.ArgumentParser()
     parser.add_argument("-q", required=False, type=int, help="Quantity of images to generate for each font")
     parser.add_argument("-o", required=False, type=str, help="Output directory for generated images", default=output_dir)
     parser.add_argument("-d", required=False, help="Delete the output folder before generating images", action="store_true")
+    parser.add_argument("-debug", required=False, help="Enable debug mode", action="store_true")
     args = parser.parse_args()
 
     qty = args.q
@@ -220,6 +210,8 @@ if __name__ == "__main__":
     if args.d:
         recreate_output_folder(args.o)
 
+    debug = args.debug or False
+
     if qty:
         # Calculate the total number of tasks for the progress bar
         total_tasks = len(fonts) * len(rand_types) * qty
@@ -229,7 +221,7 @@ if __name__ == "__main__":
             # Use ThreadPoolExecutor for parallel processing
             with ThreadPoolExecutor() as executor:
                 futures = [
-                    executor.submit(generate_images_for_font, font, qty, output_dir, progress_bar)
+                    executor.submit(generate_images_for_font, font, qty, output_dir, progress_bar, debug)
                     for font in fonts
                 ]
 

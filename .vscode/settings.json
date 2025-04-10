@@ -1,0 +1,8 @@
+{
+  "python.defaultInterpreterPath": "/mnt/c/source/repos/meditech-ocr/venv/bin/python3",
+  "python.analysis.extraPaths": [""],
+  "python.analysis.diagnosticSeverityOverrides": {
+    "reportMissingImports": "none",
+    "reportMissingModuleSource": "none"
+  }
+}

@@ -103,6 +103,6 @@ print("Canny.......:", text8.strip())
 
 # identify and draw bounding boxes around each letter in detected text
 for detection in text8:
-    
+    x, y, w, h = cv2.boundingRect(detection)
     cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0), 2)
 cv2.imshow("Detected Text", image)
