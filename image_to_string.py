@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 
 # Load the image
-image = cv2.imread("dataset/eng_0.png")
+image = cv2.imread("tesstrain/data/Meditech-ground-truth/eng_000000.tif")
 
 
 # get grayscale image
@@ -102,7 +102,7 @@ print("Text........: 01JR8667B9XFSC9FGF063TR6S2")
 print("Canny.......:", text8.strip())
 
 # identify and draw bounding boxes around each letter in detected text
-for detection in text8:
-    x, y, w, h = cv2.boundingRect(detection)
-    cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0), 2)
+# for detection in text8:
+#     x, y, w, h = cv2.boundingRect(detection)
+#     cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0), 2)
 cv2.imshow("Detected Text", image)
